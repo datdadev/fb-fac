@@ -1,47 +1,59 @@
-# 3D Printing Service Lead Notifier
+# Facebook Find And Comment (FB-FAC)
 
-An automated monitoring and alert system that checks matching posts for specific keywords (e.g., "in 3D", "thiết kế 3D") and notifies you via Telegram or Discord, letting you review leads and respond via direct links.
+An automated tool designed to **Find And Comment (FAC)** on Facebook posts matching specific campaign keywords. It crawls search results, de-scrambles obfuscated timestamps, extracts target post details, analyzes relevancy, and automatically posts language-specific comments with uploader attachments.
 
-## Project Structure
+## Key Features
 
-- `config.py`: Configuration for target keywords, Telegram Bot credentials, and Discord Webhooks.
-- `notifier.py`: Code for formatting and sending rich message alerts.
-- `monitor.py`: The check loop that retrieves content, filters matches, handles deduplication, and records state to `seen_posts.json`.
-
-## Quick Start
-
-### 1. Configuration
-
-Open `config.py` and populate the fields for your alert channels:
-
-- **Discord**:
-  1. Edit Channel -> Integrations -> Webhooks -> Create Webhook.
-  2. Copy Webhook URL and paste into `DISCORD_WEBHOOK_URL`.
-
-- **Telegram**:
-  1. Chat with `@BotFather` to create a bot and get a token. Paste into `TELEGRAM_TOKEN`.
-  2. Chat with `@userinfobot` to retrieve your Chat ID. Paste into `TELEGRAM_CHAT_ID`.
-
-### 2. Execution
-
-To run the notifier loop:
-
-```powershell
-# Set UTF-8 encoding (required on Windows to print Vietnamese characters without errors)
-$env:PYTHONIOENCODING="utf-8"
-
-# Start the monitoring service
-python monitor.py
-```
+- **Multi-Campaign Architecture**: Configure and run multiple marketing campaigns (e.g. `3d_printing`, `meccha_chameleon`) dynamically from `keywords.json` and `comment_templates.json`.
+- **Intelligent Commenting & Localization**: Automatically detects the language of a post (supports Vietnamese, English, Thai, and default fallbacks) and selects the corresponding comment template.
+- **Auto Image Uploader**: Locates the file uploader in comment sections and attaches campaign-specific images (e.g., `pic1.png`) before submitting.
+- **Computed-Style Timestamp De-scrambler**: Bypasses Facebook's anti-scraping scrambling spans (screen-reader decoy text $\le$ 1px) using window computed styles to extract clean, visual timestamps (e.g., `9h`, `2 ngày`).
+- **Post ID & Hash Resolving**: Extracts post IDs from permalinks, group set/photo parameters (`set=pcb.`, `fbid=`), or falls back to hashing the cryptographic `__cft__` token parameter to prevent duplicate comments.
+- **Rich Alerts**: Integrates Discord webhooks and Telegram alerts to notify you about matching leads.
 
 ---
 
-## Technical Note: Handling Session Authentication
+## Project Structure
 
-To integrate browser automated checks without repeatedly entering login credentials:
+- `main.py`: Interactive CLI tool entry point to manage login methods, select campaigns, and trigger the pipelines.
+- `facebook_monitor.py`: Core monitor class handling scrolling, "See more" expansion, post card visual screenshot cropping, and automated commenting.
+- `fb_auth.py`: Session management module handling cookies (`facebook_cookies.pkl`), credentials, and interactive manual login helper windows.
+- `ai_analyzer.py`: Optional Gemini AI relevance classifier and custom query scorer.
+- `comment_templates.json`: Customizable language-specific templates mapped by campaign profile.
+- `keywords.json`: Keyword files categorized by campaign profile.
 
-1. **Persistent Browser Profiles**:
-   Instead of using automated script steps to submit username/password fields, automation frameworks are typically configured to point to a local browser profile directory (e.g., Chrome's `--user-data-dir`).
-   
-2. **Session Preservation**:
-   By logging in manually once inside that profile, the session cookies are saved locally. Subsequent runs of the script use that same directory, allowing the browser to load pages in an authenticated state automatically.
+---
+
+## Setup & Configuration
+
+1. **Install Dependencies**:
+   Ensure you have Python 3.8+ and Selenium Chrome WebDriver installed.
+   ```bash
+   pip install selenium python-dotenv
+   ```
+2. **Environment Variables (`.env`)**:
+   Create a `.env` file based on `.env.example`:
+   ```env
+   FACEBOOK_EMAIL=your_email@example.com
+   FACEBOOK_PASSWORD=your_password
+   COMMENT_MODE=auto       # 'auto' or 'interactive'
+   COMMENT_DELAY_MIN=15
+   COMMENT_DELAY_MAX=45
+   TELEGRAM_TOKEN=
+   TELEGRAM_CHAT_ID=
+   DISCORD_WEBHOOK_URL=
+   ```
+
+---
+
+## How to Run
+
+1. **Start the Application**:
+   ```bash
+   python main.py
+   ```
+2. **Choose Authentication Method**:
+   - `1`: Use saved cookies (`facebook_cookies.pkl`) for silent login.
+   - `2`: Refresh session / manual login. If the saved cookies have expired, this option opens Chrome, lets you log in manually, and saves fresh cookies to file.
+3. **Select Campaign & Trigger Pipeline**:
+   Choose the campaign (e.g., Choice 2 for *Meccha Chameleon*), select choice `3` for **Full Pipeline**, and let the script find, crop, analyze, and post comments automatically!
