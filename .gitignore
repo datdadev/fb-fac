@@ -1,0 +1,31 @@
+# Credentials and configs
+.env
+facebook_cookies.pkl
+facebook_selectors.json
+
+# Cache and logs
+__pycache__/
+*.pyc
+*.log
+*.tmp
+
+# Crawled data and logs
+crawled/
+commented_posts.json
+monitor_results.json
+
+# Screenshot files and debug images
+*.png
+*.webp
+*.jpg
+*.jpeg
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Browser profiles
+chrome_profile/
+fb_profile/
+fb_chrome_profile/
