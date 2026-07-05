@@ -442,16 +442,18 @@ class FacebookMonitor:
                     # Check if already liked (to skip previously interacted posts)
                     try:
                         already_liked = False
-                        # Nút like khi đã bấm thường đổi thành "Gỡ Thích", "Bỏ Thích" hoặc "Remove Like"
-                        liked_elements = post.find_elements(By.XPATH, ".//div[@role='button' and (contains(@aria-label, 'Gỡ Thích') or contains(@aria-label, 'Remove Like') or contains(@aria-label, 'Bỏ Thích'))]")
-                        
-                        if liked_elements:
-                            already_liked = True
+                        like_btn = self._find_like_button(post)
+                        if like_btn:
+                            label = like_btn.get_attribute("aria-label")
+                            if label:
+                                label = label.lower()
+                                if "remove" in label or "gỡ" in label or "bỏ" in label:
+                                    already_liked = True
                                     
                         if already_liked:
                             print(f"    ⏭️ Bỏ qua vì bài viết đã được thả Like (đánh dấu đã xử lý).")
                             continue
-                    except:
+                    except Exception as e:
                         pass
                         
                     # Check entire post text (including group name, author, etc.)
@@ -519,15 +521,25 @@ class FacebookMonitor:
                         # Thả Like ngay tại News Feed trước khi mở tab mới
                         print("    ❤️ Đang thả Like để đánh dấu bài viết...")
                         try:
-                            like_btns = post.find_elements(By.XPATH, ".//div[@role='button' and (translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='like' or translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='thích')]")
-                            if like_btns:
-                                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", like_btns[0])
-                                time.sleep(0.5)
-                                try:
-                                    like_btns[0].click()
-                                except:
-                                    self.driver.execute_script("arguments[0].click();", like_btns[0])
-                                print("    ✅ Đã thả Like thành công!")
+                            like_btn = self._find_like_button(post)
+                            if like_btn:
+                                label = like_btn.get_attribute("aria-label")
+                                if label:
+                                    label_lower = label.lower()
+                                    if "remove" not in label_lower and "gỡ" not in label_lower and "bỏ" not in label_lower:
+                                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", like_btn)
+                                        time.sleep(0.5)
+                                        try:
+                                            # Native click (trusted event)
+                                            like_btn.click()
+                                        except:
+                                            # Fallback JS click
+                                            self.driver.execute_script("arguments[0].click();", like_btn)
+                                        print("    ✅ Đã thả Like thành công!")
+                                    else:
+                                        print("    ⚠️ Bài viết này đã được thả Like từ trước.")
+                                else:
+                                    print("    ⚠️ Tìm thấy nút Like nhưng không đọc được trạng thái.")
                             else:
                                 print("    ⚠️ Không tìm thấy nút Like để bấm.")
                         except Exception as like_err:
@@ -673,6 +685,36 @@ class FacebookMonitor:
         except Exception as e:
             print(f"    ⚠️ Get link via share error: {e}")
             return None
+
+    def _find_like_button(self, post_element):
+        """
+        Robustly find the Like button of a Facebook post.
+        Uses data-ad-rendering-role if available, otherwise falls back to aria-label matching.
+        """
+        # 1. Best case: Facebook's internal rendering role
+        try:
+            btn = post_element.find_element(By.XPATH, ".//div[@data-ad-rendering-role='like_button']/ancestor::div[@role='button']")
+            return btn
+        except:
+            pass
+            
+        # 2. Fallback case: Match by exact or partial aria-label for 'Like'/'Thích'/'Remove Like'
+        try:
+            # Lấy tất cả các nút có thể là Like
+            btns = post_element.find_elements(By.XPATH, ".//div[@role='button']")
+            for btn in btns:
+                label = btn.get_attribute("aria-label")
+                if label:
+                    label_lower = label.lower().strip()
+                    if label_lower in ["like", "thích", "remove like", "gỡ thích", "bỏ thích"]:
+                        return btn
+                    # Trường hợp chữ bị thêm/bớt khoảng trắng
+                    if "remove like" in label_lower or "gỡ thích" in label_lower or "bỏ thích" in label_lower:
+                        return btn
+        except:
+            pass
+            
+        return None
 
     def _extract_post_data_v2(self, post_element):
         """
