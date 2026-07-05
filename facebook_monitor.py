@@ -439,6 +439,21 @@ class FacebookMonitor:
                     if self._is_duplicate(post_data):
                         continue
                         
+                    # Check if already liked (to skip previously interacted posts)
+                    try:
+                        already_liked = False
+                        # Nút like khi đã bấm thường đổi thành "Gỡ Thích", "Bỏ Thích" hoặc "Remove Like"
+                        liked_elements = post.find_elements(By.XPATH, ".//div[@role='button' and (contains(@aria-label, 'Gỡ Thích') or contains(@aria-label, 'Remove Like') or contains(@aria-label, 'Bỏ Thích'))]")
+                        
+                        if liked_elements:
+                            already_liked = True
+                                    
+                        if already_liked:
+                            print(f"    ⏭️ Bỏ qua vì bài viết đã được thả Like (đánh dấu đã xử lý).")
+                            continue
+                    except:
+                        pass
+                        
                     # Check entire post text (including group name, author, etc.)
                     try:
                         full_post_text = post.text.lower()
@@ -447,8 +462,21 @@ class FacebookMonitor:
                         
                     matched_kw = None
                     for kw in self.keywords:
-                        if kw.lower() in full_post_text:
+                        kw_lower = kw.lower()
+                        # Khớp chính xác
+                        if kw_lower in full_post_text:
                             matched_kw = kw
+                            break
+                        
+                        # Khớp một phần từ khóa (nếu từ khóa dài hơn 1 từ)
+                        parts = kw_lower.split()
+                        if len(parts) > 1:
+                            for p in parts:
+                                if len(p) >= 4 and p in full_post_text:
+                                    matched_kw = p
+                                    break
+                        
+                        if matched_kw:
                             break
                             
                     if not matched_kw:
@@ -487,6 +515,23 @@ class FacebookMonitor:
                             print(f"    🔗 Lấy được URL chuẩn qua nút Share: {target_url}")
                         else:
                             print(f"    ⚠️ Không lấy được URL qua Share, dùng URL dự phòng: {target_url}")
+                            
+                        # Thả Like ngay tại News Feed trước khi mở tab mới
+                        print("    ❤️ Đang thả Like để đánh dấu bài viết...")
+                        try:
+                            like_btns = post.find_elements(By.XPATH, ".//div[@role='button' and (translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='like' or translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='thích')]")
+                            if like_btns:
+                                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", like_btns[0])
+                                time.sleep(0.5)
+                                try:
+                                    like_btns[0].click()
+                                except:
+                                    self.driver.execute_script("arguments[0].click();", like_btns[0])
+                                print("    ✅ Đã thả Like thành công!")
+                            else:
+                                print("    ⚠️ Không tìm thấy nút Like để bấm.")
+                        except Exception as like_err:
+                            print(f"    ⚠️ Lỗi khi thả Like: {like_err}")
 
                         original_window = self.driver.current_window_handle
                         self.driver.execute_script("window.open('', '_blank');")
@@ -496,19 +541,22 @@ class FacebookMonitor:
                                 self.driver.switch_to.window(window_handle)
                                 break
                         
+                        success = False
                         try:
                             success = self._comment_on_single_post(target_url, comment_text)
                             if success:
                                 self.save_commented_post(post_data, comment_text)
-                                print("    ✅ Đã bình luận xong! Đóng tab và lướt tiếp News Feed...")
-                            else:
-                                print("    ❌ Bình luận thất bại.")
                         except Exception as comment_err:
                             print(f"    ❌ Lỗi khi bình luận inline: {comment_err}")
                         finally:
                             self.driver.close()
                             self.driver.switch_to.window(original_window)
-                            time.sleep(2)
+                            time.sleep(1)
+                            
+                        if success:
+                            print("    ✅ Hoàn tất quy trình cho bài viết này!")
+                        else:
+                            print("    ❌ Bình luận thất bại.")
                     else:
                         print(f"    ⏭️ Bỏ qua bình luận do điểm thấp ({score:.2f} < {min_score})")
                         
