@@ -183,8 +183,8 @@ class AIAnalyzer:
         if not self.available or not USE_AI:
             for post in posts:
                 post['analysis'] = 'AI analysis disabled'
-                post['relevance_score'] = 0.5
-                post['recommendation'] = 'review'
+                post['relevance_score'] = 1.0
+                post['recommendation'] = 'contact'
             return posts
         
         analyzed_posts = []

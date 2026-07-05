@@ -131,12 +131,14 @@ class FacebookMonitor:
         print(f"🔑 Matched Keyword: {post_data.get('matched_keyword', 'N/A')}")
         print(f"{'='*60}")
     
-    def search(self, max_scroll=3):
+    def search(self, max_scroll=3, min_score=0.6, inline_comment=True):
         """
         Search Facebook for posts with keywords
         
         Args:
             max_scroll: Number of scrolls to load more results
+            min_score: Minimum relevance score to trigger comment
+            inline_comment: Whether to analyze and comment immediately upon finding a post
         
         Returns:
             List of post dictionaries
@@ -279,6 +281,57 @@ class FacebookMonitor:
                                     
                                     # Print full debug for new post
                                     self._print_post_debug(post_data, total_posts_found, len(self.found_posts))
+                                    
+                                    if inline_comment:
+                                        print(f"    🧠 Đang chấm điểm bài viết ngay lập tức...")
+                                        analysis = self.analyzer.analyze_post(
+                                            post_data.get('text', ''),
+                                            post_data.get('author'),
+                                            [post_data.get('matched_keyword')]
+                                        )
+                                        post_data['relevance_score'] = analysis.get('relevance_score', 0)
+                                        post_data['recommendation'] = analysis.get('recommendation', 'review')
+                                        score = post_data['relevance_score']
+                                        
+                                        print(f"    🎯 Điểm đánh giá (Score): {score:.2f}")
+                                        if score >= min_score:
+                                            print(f"    🚀 Đạt chuẩn (>= {min_score}). Tiến hành bình luận luôn...")
+                                            lang = self.detect_language(post_data.get('text', ''))
+                                            templates = self.load_comment_templates()
+                                            comment_text = templates.get(lang, templates.get("default", ""))
+                                            
+                                            # Dùng tính năng share để lấy URL chính xác
+                                            real_url = self._get_post_url_via_share(post)
+                                            target_url = real_url if real_url else post_data['url']
+                                            if real_url:
+                                                print(f"    🔗 Lấy được URL chuẩn qua nút Share: {target_url}")
+                                            else:
+                                                print(f"    ⚠️ Không lấy được URL qua Share, dùng URL dự phòng: {target_url}")
+
+                                            # Mở tab mới để comment mà không làm mất trang search hiện tại
+                                            original_window = self.driver.current_window_handle
+                                            self.driver.execute_script("window.open('', '_blank');")
+                                            time.sleep(1)
+                                            for window_handle in self.driver.window_handles:
+                                                if window_handle != original_window:
+                                                    self.driver.switch_to.window(window_handle)
+                                                    break
+                                            
+                                            try:
+                                                success = self._comment_on_single_post(target_url, comment_text)
+                                                if success:
+                                                    self.save_commented_post(post_data, comment_text)
+                                                    print("    ✅ Đã bình luận xong! Đóng tab và quay lại cào tiếp...")
+                                                else:
+                                                    print("    ❌ Bình luận thất bại.")
+                                            except Exception as comment_err:
+                                                print(f"    ❌ Lỗi khi bình luận inline: {comment_err}")
+                                            finally:
+                                                self.driver.close()
+                                                self.driver.switch_to.window(original_window)
+                                                time.sleep(2)
+                                        else:
+                                            print(f"    ⏭️ Bỏ qua bình luận do điểm thấp ({score:.2f} < {min_score})")
                                 else:
                                     print(f"    ⏭️ Duplicate detected - skipped")
                             else:
@@ -329,6 +382,250 @@ class FacebookMonitor:
         
         return self.found_posts
     
+    def monitor_news_feed(self, max_scroll=10, min_score=0.6):
+        """
+        Scroll through the Facebook News Feed normally, detect keywords, and comment inline.
+        """
+        if not self.keywords:
+            print("❌ No keywords loaded to monitor.")
+            return []
+            
+        print("\n" + "="*60)
+        print("📰 CHẾ ĐỘ LƯỚT BẢNG TIN (NEWS FEED)")
+        print("📢 TOOL ĐANG LƯỚT FACEBOOK NHƯ NGƯỜI BÌNH THƯỜNG...")
+        print("📢 NẾU THẤY BÀI VIẾT CÓ CHỨA TỪ KHÓA -> CHẤM ĐIỂM -> BÌNH LUẬN NGAY!")
+        print("="*60)
+        
+        self.driver.get("https://www.facebook.com/")
+        time.sleep(5)
+        
+        # Create crawled directory
+        date_str = datetime.datetime.now().strftime("%d%m%Y")
+        crawled_dir = os.path.join(".", "crawled", date_str)
+        os.makedirs(crawled_dir, exist_ok=True)
+        
+        scroll_count = 0
+        total_posts_found = 0
+        
+        while scroll_count < max_scroll:
+            print(f"\n📜 Đang lướt News Feed lần {scroll_count + 1}/{max_scroll}...")
+            
+            # Find posts on news feed
+            posts = []
+            try:
+                posts = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'x1yztbdb')]")
+                if not posts:
+                    posts = self.driver.find_elements(By.XPATH, "//div[@data-ad-comet-preview]")
+                if not posts:
+                    candidate_posts = self.driver.find_elements(By.CSS_SELECTOR, "[role='article']")
+                    for p in candidate_posts:
+                        try:
+                            if p.text and len(p.text.strip()) > 30:
+                                posts.append(p)
+                        except:
+                            pass
+            except:
+                pass
+                
+            print(f"  📊 Tìm thấy {len(posts)} bài viết trên màn hình hiện tại.")
+            
+            for idx, post in enumerate(posts, 1):
+                try:
+                    post_data = self._extract_post_data_v2(post)
+                    if not post_data or not post_data.get('text'):
+                        continue
+                        
+                    # Check duplicate
+                    if self._is_duplicate(post_data):
+                        continue
+                        
+                    # Check entire post text (including group name, author, etc.)
+                    try:
+                        full_post_text = post.text.lower()
+                    except:
+                        full_post_text = post_data['text'].lower()
+                        
+                    matched_kw = None
+                    for kw in self.keywords:
+                        if kw.lower() in full_post_text:
+                            matched_kw = kw
+                            break
+                            
+                    if not matched_kw:
+                        continue
+                        
+                    post_data['matched_keyword'] = matched_kw
+                    self.found_posts.append(post_data)
+                    total_posts_found += 1
+                    
+                    print(f"\n  🎉 PHÁT HIỆN BÀI VIẾT CHỨA TỪ KHÓA '{matched_kw}'!")
+                    print(f"    Author: {post_data.get('author', 'Unknown')}")
+                    print(f"    Content: {post_data.get('text', '')[:100]}...")
+                    
+                    # Analyze and comment inline
+                    print(f"    🧠 Đang chấm điểm bài viết...")
+                    analysis = self.analyzer.analyze_post(
+                        post_data.get('text', ''),
+                        post_data.get('author'),
+                        [matched_kw]
+                    )
+                    post_data['relevance_score'] = analysis.get('relevance_score', 0)
+                    post_data['recommendation'] = analysis.get('recommendation', 'review')
+                    score = post_data['relevance_score']
+                    
+                    print(f"    🎯 Điểm đánh giá (Score): {score:.2f}")
+                    if score >= min_score:
+                        print(f"    🚀 Đạt chuẩn (>= {min_score}). Tiến hành bình luận luôn...")
+                        lang = self.detect_language(post_data.get('text', ''))
+                        templates = self.load_comment_templates()
+                        comment_text = templates.get(lang, templates.get("default", ""))
+                        
+                        # Dùng tính năng share để lấy URL chính xác
+                        real_url = self._get_post_url_via_share(post)
+                        target_url = real_url if real_url else post_data['url']
+                        if real_url:
+                            print(f"    🔗 Lấy được URL chuẩn qua nút Share: {target_url}")
+                        else:
+                            print(f"    ⚠️ Không lấy được URL qua Share, dùng URL dự phòng: {target_url}")
+
+                        original_window = self.driver.current_window_handle
+                        self.driver.execute_script("window.open('', '_blank');")
+                        time.sleep(1)
+                        for window_handle in self.driver.window_handles:
+                            if window_handle != original_window:
+                                self.driver.switch_to.window(window_handle)
+                                break
+                        
+                        try:
+                            success = self._comment_on_single_post(target_url, comment_text)
+                            if success:
+                                self.save_commented_post(post_data, comment_text)
+                                print("    ✅ Đã bình luận xong! Đóng tab và lướt tiếp News Feed...")
+                            else:
+                                print("    ❌ Bình luận thất bại.")
+                        except Exception as comment_err:
+                            print(f"    ❌ Lỗi khi bình luận inline: {comment_err}")
+                        finally:
+                            self.driver.close()
+                            self.driver.switch_to.window(original_window)
+                            time.sleep(2)
+                    else:
+                        print(f"    ⏭️ Bỏ qua bình luận do điểm thấp ({score:.2f} < {min_score})")
+                        
+                except Exception as e:
+                    continue
+                    
+            print(f"\n  ⬇️ Tiếp tục cuộn trang xuống...")
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(4)
+            scroll_count += 1
+            
+        print(f"\n{'='*60}")
+        print(f"📊 KẾT THÚC LƯỚT BẢNG TIN (Đã tìm thấy {total_posts_found} bài liên quan)")
+        print(f"{'='*60}")
+        return self.found_posts
+
+    def _get_post_url_via_share(self, post_element):
+        """
+        Click the 'Share' button, then 'Copy link', and read from the Windows clipboard.
+        """
+        try:
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_element)
+            time.sleep(1)
+            
+            # Find Share button
+            share_buttons = post_element.find_elements(By.XPATH, ".//div[@role='button' and (contains(@aria-label, 'Chia sẻ') or contains(@aria-label, 'Share'))]")
+            if not share_buttons:
+                share_buttons = post_element.find_elements(By.XPATH, ".//div[contains(@class, 'x1i10hfl')]//*[contains(text(), 'Chia sẻ') or contains(text(), 'Share')]/ancestor::div[@role='button']")
+                
+            share_btn = None
+            for btn in share_buttons:
+                if btn.is_displayed():
+                    share_btn = btn
+                    break
+                    
+            if not share_btn:
+                return None
+                
+            self.driver.execute_script("arguments[0].click();", share_btn)
+            
+            # Find Copy link button in popup (robust search with fast retry)
+            copy_btn = None
+            for attempt in range(5): # Thử tối đa 5 lần, mỗi lần 0.3s (tổng 1.5s)
+                time.sleep(0.3)
+                # 1. Search inside menuitems
+                menuitems = self.driver.find_elements(By.XPATH, "//div[@role='menuitem']")
+                for item in menuitems:
+                    try:
+                        if item.is_displayed():
+                            text = item.text.lower().strip()
+                            if text in ["copy link", "sao chép liên kết", "sao chép"]:
+                                copy_btn = item
+                                break
+                            elif "copy link" in text or "sao chép" in text:
+                                copy_btn = item
+                                break
+                    except:
+                        continue
+                        
+                if copy_btn:
+                    break
+                        
+                # 2. Aggressive fallback search (Optimized for speed using Browser-side XPath filtering)
+                # Dùng translate() trong XPath để tìm kiếm không phân biệt hoa thường và tìm trực tiếp element chứa text
+                elements = self.driver.find_elements(By.XPATH, "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'copy link') or contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sao chép')]")
+                for item in elements:
+                    try:
+                        if item.is_displayed():
+                            copy_btn = item
+                            # Cố gắng tìm thẻ cha là nút bấm thực sự để click cho chuẩn
+                            try:
+                                btn_parent = item.find_element(By.XPATH, "./ancestor::div[@role='button' or @role='menuitem']")
+                                copy_btn = btn_parent
+                            except:
+                                pass
+                            break
+                    except:
+                        continue
+                        
+                if copy_btn:
+                    break
+                        
+            if not copy_btn:
+                print("    ⚠️ Không tìm thấy nút Copy Link trong Menu Share")
+                # Close popup
+                from selenium.webdriver.common.action_chains import ActionChains
+                ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+                return None
+                
+            # Must use native click to trigger clipboard permissions (JS click won't work)
+            try:
+                copy_btn.click()
+            except:
+                try:
+                    from selenium.webdriver.common.action_chains import ActionChains
+                    ActionChains(self.driver).move_to_element(copy_btn).click().perform()
+                except:
+                    self.driver.execute_script("arguments[0].click();", copy_btn)
+                    
+            time.sleep(0.5) # Chỉ cần đợi 0.5s là đủ để clipboard nhận dữ liệu
+            
+            # Read from Windows clipboard using powershell (safe from segfaults)
+            import subprocess
+            try:
+                result = subprocess.run(['powershell', '-command', 'Get-Clipboard'], capture_output=True, text=True, timeout=5)
+                url = result.stdout.strip()
+            except Exception as clip_err:
+                print(f"    ⚠️ Lỗi đọc clipboard: {clip_err}")
+                url = ""
+            
+            if url and ("facebook.com" in url or "fb.watch" in url):
+                return url
+            return None
+        except Exception as e:
+            print(f"    ⚠️ Get link via share error: {e}")
+            return None
+
     def _extract_post_data_v2(self, post_element):
         """
         Extract data from a Facebook post element - Updated version
@@ -834,9 +1131,9 @@ class FacebookMonitor:
 
     def _get_campaign_image_path(self):
         """
-        Get the image path for the Meccha Chameleon campaign
+        Get the image path for the current campaign (e.g., meccha_chameleon or 3d_printing)
         """
-        base_path = r"D:\LTD\dont_delete\facebook_commentor\resources\meccha_chameleon\pic1"
+        base_path = os.path.join(r"D:\LTD\dont_delete\facebook_commentor\resources", self.campaign, "pic1")
         if os.path.exists(base_path):
             if os.path.isdir(base_path):
                 for f in os.listdir(base_path):
@@ -959,46 +1256,45 @@ class FacebookMonitor:
             comment_input.send_keys(comment_text)
             time.sleep(1.5)
             
-            # If campaign is meccha_chameleon, upload picture before hitting RETURN
-            if self.campaign == "meccha_chameleon":
-                image_path = self._get_campaign_image_path()
-                if image_path:
+            # Upload picture if available for the current campaign before hitting RETURN
+            image_path = self._get_campaign_image_path()
+            if image_path:
+                try:
+                    print(f"📷 Attempting to attach image: {image_path}")
+                    file_input = None
+                    
+                    # Find the hidden input file element inside the same comment container/form
                     try:
-                        print(f"📷 Attempting to attach image: {image_path}")
-                        file_input = None
+                        ancestor_form = comment_input.find_element(By.XPATH, "./ancestor::form")
+                        file_input = ancestor_form.find_element(By.XPATH, ".//input[@type='file']")
+                    except:
+                        pass
                         
-                        # Find the hidden input file element inside the same comment container/form
+                    if not file_input:
                         try:
-                            ancestor_form = comment_input.find_element(By.XPATH, "./ancestor::form")
-                            file_input = ancestor_form.find_element(By.XPATH, ".//input[@type='file']")
+                            # Look for file inputs nearby
+                            file_input = comment_input.find_element(By.XPATH, "../..//input[@type='file']")
                         except:
                             pass
                             
-                        if not file_input:
-                            try:
-                                # Look for file inputs nearby
-                                file_input = comment_input.find_element(By.XPATH, "../..//input[@type='file']")
-                            except:
-                                pass
-                                
-                        if not file_input:
-                            try:
-                                file_inputs = self.driver.find_elements(By.XPATH, "//input[@type='file']")
-                                for inp in file_inputs:
-                                    if inp.is_enabled():
-                                        file_input = inp
-                                        break
-                            except:
-                                pass
-                                
-                        if file_input:
-                            file_input.send_keys(os.path.abspath(image_path))
-                            print("✅ Attached image successfully! Waiting for upload to complete...")
-                            time.sleep(5) # Wait for image to upload and display
-                        else:
-                            print("⚠️ Could not find file input element to attach image.")
-                    except Exception as upload_err:
-                        print(f"❌ Error uploading image: {upload_err}")
+                    if not file_input:
+                        try:
+                            file_inputs = self.driver.find_elements(By.XPATH, "//input[@type='file']")
+                            for inp in file_inputs:
+                                if inp.is_enabled():
+                                    file_input = inp
+                                    break
+                        except:
+                            pass
+                            
+                    if file_input:
+                        file_input.send_keys(os.path.abspath(image_path))
+                        print("✅ Attached image successfully! Waiting for upload to complete...")
+                        time.sleep(5) # Wait for image to upload and display
+                    else:
+                        print("⚠️ Could not find file input element to attach image.")
+                except Exception as upload_err:
+                    print(f"❌ Error uploading image: {upload_err}")
 
             comment_input.send_keys(Keys.RETURN)
             print("🚀 Pressed Enter to post comment!")
