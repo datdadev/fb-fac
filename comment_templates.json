@@ -1,4 +1,4 @@
-{
+﻿{
   "3d_printing": {
     "vi": "Chào bạn, bên mình chuyên nhận thiết kế và in 3D chất lượng cao tại HCM và HN. Bạn check tin nhắn chờ/inbox mình trao đổi chi tiết nhé!",
     "en": "Hi, we specialize in high-quality 3D printing and design services. Please check your message requests/inbox so we can discuss the details of your project!",
@@ -6,10 +6,10 @@
     "default": "Chào bạn, bên mình chuyên nhận thiết kế và in 3D chất lượng cao. Please check your inbox/message requests so we can discuss the details!"
   },
   "meccha_chameleon": {
-    "vi": "Shopee 3DBro có đủ 20 dáng pose, chỉ 16k/1 con mô hình ạ :)) \nSưu tầm nhiều đc giảm thêm á ạ\n- VN: https://vn.shp.ee/iZNy9Qn3\n- SG: https://sg.shp.ee/o3W1MZaA\n- MY: https://my.shp.ee/Qc4afSWD",
-    "en": "We are selling these figures with up to 20 poses on Shopee “3DBro”, which located in Vietnam, for Southeast Asian countries with very low price for mass or single purchase\n- VN: https://vn.shp.ee/iZNy9Qn3\n- SG: https://sg.shp.ee/o3W1MZaA\n- MY: https://my.shp.ee/Qc4afSWD",
-    "th": "พวกเราจำหน่ายฟิกเกอร์ที่มีท่าทางให้เลือกมากถึง 20 แบบ บน Shopee ร้าน “3DBro” จากประเทศเวียดนาม พร้อมส่งไปยังกลุ่มประเทศเอเชียตะวันออกเฉียงใต้ ในราคาสุดพิเศษและถูกมากๆ รองรับทั้งการสั่งซื้อจำนวนมาก (ราคาส่ง) หรือซื้อแยกชิ้นเดียว\n- VN: https://vn.shp.ee/iZNy9Qn3\n- SG: https://sg.shp.ee/o3W1MZaA\n- MY: https://my.shp.ee/Qc4afSWD",
-    "zh": "越南蝦皮「3DBro」模型熱賣中！多達 20 種姿勢任你挑選。無論是單隻收藏還是大量批發，我們都提供超佛心的優惠價，跨國直送東南亞各國！🛒✨\n傳送門 👉 \n- VN: https://vn.shp.ee/iZNy9Qn3\n- SG: https://sg.shp.ee/o3W1MZaA\n- MY: https://my.shp.ee/Qc4afSWD",
-    "default": "We are selling these figures with up to 20 poses on Shopee “3DBro”, which located in Vietnam, for Southeast Asian countries with very low price for mass or single purchase\n- VN: https://vn.shp.ee/iZNy9Qn3\n- SG: https://sg.shp.ee/o3W1MZaA\n- MY: https://my.shp.ee/Qc4afSWD"
+    "vi": "Shopee 3DBro có đủ 20 dáng pose, chỉ 16k/1 con mô hình ạ :)) \nSưu tầm nhiều đc giảm thêm á ạ\n👉 Đặt mua tại VN: https://vn.shp.ee/iZNy9Qn3",
+    "en": "We are selling these figures with up to 20 poses on Shopee “3DBro” with very low price for mass or single purchase.\n👉 Link for Malaysia: https://my.shp.ee/Qc4afSWD",
+    "th": "พวกเราจำหน่ายฟิกเกอร์ที่มีท่าทางให้เลือกมากถึง 20 แบบ บน Shopee ร้าน “3DBro” ในราคาสุดพิเศษและถูกมากๆ รองรับทั้งการสั่งซื้อจำนวนมาก (ราคาส่ง) หรือซื้อแยกชิ้นเดียว\n👉 สั่งซื้อผ่าน Shopee: https://vn.shp.ee/iZNy9Qn3",
+    "zh": "越南蝦皮「3DBro」模型熱賣中！多達 20 種姿勢任你挑選。無論是單隻收藏還是大量批發，我們都提供超佛心的優惠價，跨國直送東南亞各國！🛒✨\n傳送門 👉 https://sg.shp.ee/o3W1MZaA",
+    "default": "We are selling these figures with up to 20 poses on Shopee “3DBro” with very low price for mass or single purchase.\n👉 https://my.shp.ee/Qc4afSWD"
   }
 }
