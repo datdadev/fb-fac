@@ -1530,17 +1530,22 @@ class FacebookMonitor:
                     except:
                         pass
                 
-                # Xử lý \n thành Shift+Enter để không bị tách thành nhiều comment
+                # Paste text using pyperclip to bypass emoji and contenteditable issues
+                import pyperclip
                 from selenium.webdriver.common.action_chains import ActionChains
-                actions = ActionChains(self.driver)
                 
-                lines = ind_comment.split('\n')
-                for i, line in enumerate(lines):
-                    actions.send_keys(line)
-                    if i < len(lines) - 1:
-                        actions.key_down(Keys.SHIFT).send_keys(Keys.ENTER).key_up(Keys.SHIFT)
+                # Format text: change \n to standard newlines, facebook will parse them correctly when pasted
+                pyperclip.copy(ind_comment)
                 
-                actions.perform()
+                try:
+                    # Focus first
+                    comment_input.click()
+                except:
+                    self.driver.execute_script("arguments[0].focus();", comment_input)
+                
+                # Ctrl+V
+                ActionChains(self.driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+                
                 time.sleep(1.5)
                 
                 # Upload picture ONLY for the FIRST independent comment
