@@ -10,6 +10,7 @@ import hashlib
 import os
 import random
 import datetime
+import io
 import config
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -498,6 +499,16 @@ class FacebookMonitor:
         self.driver.get("https://www.facebook.com/")
         time.sleep(5)
         
+        # Initialize OCR Reader (only once)
+        print("🤖 Đang khởi tạo AI bóc chữ từ ảnh (EasyOCR)... có thể mất vài giây.")
+        try:
+            import easyocr
+            ocr_reader = easyocr.Reader(['vi', 'en'], gpu=False)
+            print("✅ Khởi tạo OCR thành công!")
+        except Exception as e:
+            print(f"⚠️ Lỗi khởi tạo OCR: {e}. Sẽ tiếp tục mà không có nhận diện ảnh.")
+            ocr_reader = None
+        
         # Create crawled directory
         date_str = datetime.datetime.now().strftime("%d%m%Y")
         crawled_dir = os.path.join(".", "crawled", date_str)
@@ -593,10 +604,49 @@ class FacebookMonitor:
                             break
                             
                     if not matched_kw:
-                        print(f"    ⏭️ Post #{idx}: No keyword matched. Snippet: {full_post_text[:100].replace(chr(10), ' ')}...")
+                        # OCR Fallback Strategy
+                        if ocr_reader:
+                            try:
+                                print(f"    📸 Post #{idx} không có text hợp lệ. Đang chụp ảnh để OCR bóc chữ...")
+                                png_bytes = post.screenshot_as_png
+                                img_bytes = io.BytesIO(png_bytes)
+                                
+                                ocr_results = ocr_reader.readtext(img_bytes.read(), detail=0)
+                                ocr_text = " ".join(ocr_results).lower()
+                                
+                                if ocr_text:
+                                    print(f"    🧠 OCR Text bóc được: '{ocr_text[:100]}...'")
+                                    # Append OCR text to full_post_text for keyword matching and AI context
+                                    full_post_text += " " + ocr_text
+                                    
+                                    # Re-evaluate keywords against OCR text
+                                    for kw in self.keywords:
+                                        kw_lower = kw.lower()
+                                        if kw_lower in ocr_text:
+                                            matched_kw = kw
+                                            break
+                                        
+                                        parts = kw_lower.split()
+                                        if len(parts) > 1:
+                                            for p in parts:
+                                                if len(p) >= 4 and p in ocr_text:
+                                                    matched_kw = p
+                                                    break
+                                        
+                                        if matched_kw:
+                                            break
+                            except Exception as ocr_err:
+                                print(f"    ⚠️ OCR Error: {ocr_err}")
+                                
+                    if not matched_kw:
+                        print(f"    ⏭️ Post #{idx}: No keyword matched (cả text lẫn ảnh). Snippet: {full_post_text[:100].replace(chr(10), ' ')}...")
                         continue
                         
                     post_data['matched_keyword'] = matched_kw
+                    
+                    # Update the extracted text with OCR text so the AI analyzer can also see it
+                    post_data['text'] = full_post_text
+                    
                     self.found_posts.append(post_data)
                     total_posts_found += 1
                     
