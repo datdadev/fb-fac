@@ -548,13 +548,26 @@ class FacebookMonitor:
                                                 
                                         if not click_success:
                                             try:
-                                                self.driver.execute_script("arguments[0].click();", like_btn)
+                                                # Cố gắng click vào phần tử lõi bên trong thay vì wrapper ngoài bằng JS
+                                                inner = like_btn.find_elements(By.XPATH, ".//div[@data-ad-rendering-role='like_button']")
+                                                if inner:
+                                                    self.driver.execute_script("arguments[0].click();", inner[0])
+                                                else:
+                                                    self.driver.execute_script("arguments[0].click();", like_btn)
                                                 click_success = True
                                             except Exception as e:
                                                 print(f"    [Debug] JS click failed: {e}")
                                                 
                                         if click_success:
-                                            print("    ✅ Đã thả Like thành công!")
+                                            time.sleep(2) # Đợi Facebook update DOM
+                                            try:
+                                                new_label = like_btn.get_attribute("aria-label") or ""
+                                                if "remove" in new_label.lower() or "bỏ" in new_label.lower() or "gỡ" in new_label.lower():
+                                                    print("    ✅ Đã thả Like thành công!")
+                                                else:
+                                                    print(f"    ⚠️ Đã bấm Like nhưng trạng thái chưa đổi (Label hiện tại: {new_label}). Có thể bị Facebook chặn click.")
+                                            except:
+                                                print("    ✅ Đã thả Like thành công (không thể verify lại label)!")
                                         else:
                                             print("    ❌ Không thể click nút Like bằng bất kỳ cách nào.")
                                         time.sleep(1)
