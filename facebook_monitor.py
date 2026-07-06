@@ -1531,12 +1531,16 @@ class FacebookMonitor:
                         pass
                 
                 # Xử lý \n thành Shift+Enter để không bị tách thành nhiều comment
+                from selenium.webdriver.common.action_chains import ActionChains
+                actions = ActionChains(self.driver)
+                
                 lines = ind_comment.split('\n')
                 for i, line in enumerate(lines):
-                    comment_input.send_keys(line)
+                    actions.send_keys(line)
                     if i < len(lines) - 1:
-                        comment_input.send_keys(Keys.SHIFT, Keys.ENTER)
+                        actions.key_down(Keys.SHIFT).send_keys(Keys.ENTER).key_up(Keys.SHIFT)
                 
+                actions.perform()
                 time.sleep(1.5)
                 
                 # Upload picture ONLY for the FIRST independent comment
@@ -1580,7 +1584,12 @@ class FacebookMonitor:
                         except Exception as upload_err:
                             print(f"❌ Error uploading image: {upload_err}")
 
-                comment_input.send_keys(Keys.RETURN)
+                # Nhấn Enter để gửi comment (nếu send_keys trên phần tử lỗi thì dùng ActionChains)
+                try:
+                    comment_input.send_keys(Keys.RETURN)
+                except:
+                    ActionChains(self.driver).send_keys(Keys.RETURN).perform()
+                    
                 print(f"🚀 Pressed Enter to post comment #{idx + 1}!")
                 time.sleep(4)
             
