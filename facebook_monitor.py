@@ -261,6 +261,23 @@ class FacebookMonitor:
                                 
                                 # Check duplicate
                                 if not self._is_duplicate(post_data):
+                                    # Check if already liked (to skip previously interacted posts)
+                                    try:
+                                        already_liked = False
+                                        like_btn = self._find_like_button(post)
+                                        if like_btn:
+                                            label = like_btn.get_attribute("aria-label")
+                                            if label:
+                                                label_lower = label.lower()
+                                                if "remove" in label_lower or "bỏ" in label_lower or "gỡ" in label_lower:
+                                                    already_liked = True
+                                                    
+                                        if already_liked:
+                                            print(f"    ⏭️ Bài viết này đã được thả Like từ trước -> Bỏ qua không comment.")
+                                            continue
+                                    except Exception as e:
+                                        print(f"    ⚠️ Lỗi khi kiểm tra trạng thái Like: {e}")
+                                
                                     post_data['matched_keyword'] = keyword
                                     self.found_posts.append(post_data)
                                     posts_found_this_keyword += 1
@@ -307,6 +324,62 @@ class FacebookMonitor:
                                                 print(f"    🔗 Lấy được URL chuẩn qua nút Share: {target_url}")
                                             else:
                                                 print(f"    ⚠️ Không lấy được URL qua Share, dùng URL dự phòng: {target_url}")
+
+                                            # Thử Like ngay tại trang Search trước khi mở tab mới
+                                            print("    👉 Đang thả Like để đánh dấu bài viết...")
+                                            try:
+                                                like_btn = self._find_like_button(post)
+                                                if like_btn:
+                                                    label = like_btn.get_attribute("aria-label")
+                                                    if label:
+                                                        label_lower = label.lower()
+                                                        if "remove" not in label_lower and "gỡ" not in label_lower and "bỏ" not in label_lower:
+                                                            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", like_btn)
+                                                            time.sleep(1.0)
+                                                            
+                                                            click_success = False
+                                                            try:
+                                                                from selenium.webdriver.common.action_chains import ActionChains
+                                                                ActionChains(self.driver).move_to_element(like_btn).click().perform()
+                                                                click_success = True
+                                                            except Exception as e:
+                                                                pass
+                                                            
+                                                            if not click_success:
+                                                                try:
+                                                                    like_btn.click()
+                                                                    click_success = True
+                                                                except Exception as e:
+                                                                    pass
+                                                                    
+                                                            if not click_success:
+                                                                try:
+                                                                    inner = like_btn.find_elements(By.XPATH, ".//div[@data-ad-rendering-role='like_button']")
+                                                                    if inner:
+                                                                        self.driver.execute_script("arguments[0].click();", inner[0])
+                                                                    else:
+                                                                        self.driver.execute_script("arguments[0].click();", like_btn)
+                                                                    click_success = True
+                                                                except Exception as e:
+                                                                    pass
+                                                                    
+                                                            if click_success:
+                                                                time.sleep(2)
+                                                                try:
+                                                                    new_label = like_btn.get_attribute("aria-label") or ""
+                                                                    if "remove" in new_label.lower() or "bỏ" in new_label.lower() or "gỡ" in new_label.lower():
+                                                                        print("    ✅ Đã thả Like thành công!")
+                                                                    else:
+                                                                        print(f"    ⚠️ Đã bấm Like nhưng trạng thái chưa đổi (Label hiện tại: {new_label}).")
+                                                                except:
+                                                                    print("    ✅ Đã thả Like thành công (không thể verify lại label)!")
+                                                            else:
+                                                                print("    ❌ Không thể click nút Like bằng bất kỳ cách nào.")
+                                                            time.sleep(1)
+                                                        else:
+                                                            print("    ⚠️ Bài viết này đã được thả Like từ trước.")
+                                            except Exception as e:
+                                                print(f"    ⚠️ Lỗi khi thả Like: {e}")
 
                                             # Mở tab mới để comment mà không làm mất trang search hiện tại
                                             original_window = self.driver.current_window_handle
