@@ -528,18 +528,35 @@ class FacebookMonitor:
                                     label_lower = label.lower()
                                     if "remove" not in label_lower and "gỡ" not in label_lower and "bỏ" not in label_lower:
                                         self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", like_btn)
-                                        time.sleep(0.5)
+                                        time.sleep(1.0) # Tăng thời gian chờ sau khi scroll
+                                        
+                                        # Thử 3 cách click: ActionChains -> Native -> JS
+                                        click_success = False
                                         try:
-                                            # Native click bằng ActionChains (tự nhiên nhất)
                                             from selenium.webdriver.common.action_chains import ActionChains
                                             ActionChains(self.driver).move_to_element(like_btn).click().perform()
-                                        except:
+                                            click_success = True
+                                        except Exception as e:
+                                            print(f"    [Debug] ActionChains click failed: {e}")
+                                            
+                                        if not click_success:
                                             try:
                                                 like_btn.click()
-                                            except:
-                                                # Fallback JS click
+                                                click_success = True
+                                            except Exception as e:
+                                                print(f"    [Debug] Native click failed: {e}")
+                                                
+                                        if not click_success:
+                                            try:
                                                 self.driver.execute_script("arguments[0].click();", like_btn)
-                                        print("    ✅ Đã thả Like thành công!")
+                                                click_success = True
+                                            except Exception as e:
+                                                print(f"    [Debug] JS click failed: {e}")
+                                                
+                                        if click_success:
+                                            print("    ✅ Đã thả Like thành công!")
+                                        else:
+                                            print("    ❌ Không thể click nút Like bằng bất kỳ cách nào.")
                                         time.sleep(1)
                                     else:
                                         print("    ⚠️ Bài viết này đã được thả Like từ trước.")
@@ -697,33 +714,36 @@ class FacebookMonitor:
         Uses data-ad-rendering-role if available, otherwise falls back to aria-label matching.
         """
         try:
-            # Lấy tất cả các nút có thể là Like
             btns = post_element.find_elements(By.XPATH, ".//div[@role='button']")
+            # print(f"    [Debug] Found {len(btns)} role='button' elements in post.")
             
             # Ưu tiên 1: Tìm bằng data-ad-rendering-role bên trong nút (chính xác 100%)
-            for btn in btns:
+            for idx, btn in enumerate(btns):
                 try:
                     if btn.find_elements(By.XPATH, ".//div[@data-ad-rendering-role='like_button']"):
-                        # Đảm bảo đây là wrapper có aria-label chứa trạng thái (tránh lấy nhầm wrapper nhỏ xíu bên trong)
-                        if btn.get_attribute("aria-label"):
+                        lbl = btn.get_attribute("aria-label")
+                        # print(f"    [Debug] Btn {idx} has like_button role. aria-label='{lbl}'")
+                        if lbl:
                             return btn
                 except:
                     pass
             
             # Ưu tiên 2: Tìm bằng aria-label chuẩn
-            for btn in btns:
+            for idx, btn in enumerate(btns):
                 label = btn.get_attribute("aria-label")
                 if label:
                     label_lower = label.lower().strip()
                     if label_lower in ["like", "thích", "remove like", "gỡ thích", "bỏ thích"]:
+                        # print(f"    [Debug] Found via exact label: {label_lower}")
                         return btn
             
-            # Ưu tiên 3: Tìm bằng aria-label chứa từ khóa (có thể có khoảng trắng thừa)
-            for btn in btns:
+            # Ưu tiên 3: Tìm bằng aria-label chứa từ khóa
+            for idx, btn in enumerate(btns):
                 label = btn.get_attribute("aria-label")
                 if label:
                     label_lower = label.lower().strip()
                     if "remove like" in label_lower or "gỡ thích" in label_lower or "bỏ thích" in label_lower:
+                        # print(f"    [Debug] Found via partial label: {label_lower}")
                         return btn
                         
         except Exception as e:
