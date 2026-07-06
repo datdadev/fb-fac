@@ -67,7 +67,7 @@ class AIAnalyzer:
         except Exception as e:
             print(f"[AI] ❌ Error initializing Gemini: {e}")
     
-    def analyze_post(self, post_text, post_author=None, keywords_matched=None):
+    def analyze_post(self, post_text, post_author=None, keywords_matched=None, campaign=None, templates=None):
         """
         Analyze a Facebook post using AI
         
@@ -75,6 +75,8 @@ class AIAnalyzer:
             post_text: Content of the post
             post_author: Author of the post
             keywords_matched: Keywords that matched
+            campaign: The name of the marketing campaign
+            templates: Dict of comment templates for context
         
         Returns:
             dict: Analysis result with reasoning, relevance, and recommendation
@@ -97,31 +99,39 @@ class AIAnalyzer:
         
         try:
             # Build prompt
+            campaign_str = campaign or "our product/service"
+            templates_str = json.dumps(templates, ensure_ascii=False) if templates else "No specific templates provided."
+            
             prompt = f"""
-            Analyze this Facebook post for 3D printing service relevance.
+            Analyze this Facebook post for relevance to our marketing campaign: '{campaign_str}'.
             
             Post Content: "{post_text[:1000]}"
             Author: {post_author or 'Unknown'}
             Keywords matched: {', '.join(keywords_matched) if keywords_matched else 'None'}
             
-            Evaluate if this post represents a genuine request for 3D printing services.
+            Evaluate if this post represents a genuine interest or request related to our campaign '{campaign_str}'.
             
             Consider:
-            1. Is the user actively seeking 3D printing services?
-            2. Do they have a specific project/need?
-            3. Are they asking for quotes or recommendations?
-            4. Is this a legitimate business opportunity?
-            5. Would our 3D printing service be suitable for their needs?
+            1. Is the user actively seeking our product/service?
+            2. Do they have a specific need related to '{campaign_str}'?
+            3. Are they asking for prices, quotes, or recommendations?
+            4. Is this a legitimate business/sales opportunity?
+            5. Would our campaign offering be suitable for their needs?
             
-            Respond in JSON format with these fields:
+            We also have these predefined comment templates for this campaign:
+            {templates_str}
+            
+            IMPORTANT: Write a HIGHLY NATURAL, contextual response (in the same language as the post) that answers the user's specific context but strategically includes the links or key information from our templates. Do not sound like a bot.
+            
+            Respond in JSON format with these exact fields:
             {{
                 "is_relevant": true/false,
                 "relevance_score": 0-1,
                 "reasoning": "brief explanation",
                 "recommendation": "contact" | "review" | "skip",
-                "service_needed": "what 3D printing service they need",
+                "service_needed": "what they need",
                 "urgency": "high" | "medium" | "low",
-                "suggested_response": "recommended reply template"
+                "suggested_response": "The natural, contextual reply you generated"
             }}
             
             Return ONLY valid JSON, no other text.
@@ -170,12 +180,14 @@ class AIAnalyzer:
                 'reasoning': 'Technical error during analysis'
             }
     
-    def analyze_batch(self, posts):
+    def analyze_batch(self, posts, campaign=None, templates=None):
         """
         Analyze multiple posts in batch
         
         Args:
             posts: List of post dictionaries
+            campaign: The name of the marketing campaign
+            templates: Dict of comment templates for context
         
         Returns:
             List of posts with analysis added
@@ -196,7 +208,9 @@ class AIAnalyzer:
             analysis = self.analyze_post(
                 post.get('text', ''),
                 post.get('author'),
-                post.get('keyword_matched', [])
+                post.get('keyword_matched', []),
+                campaign=campaign,
+                templates=templates
             )
             
             # Merge analysis into post

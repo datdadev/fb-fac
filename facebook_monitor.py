@@ -331,7 +331,9 @@ class FacebookMonitor:
                                         analysis = self.analyzer.analyze_post(
                                             post_data.get('text', ''),
                                             post_data.get('author'),
-                                            [post_data.get('matched_keyword')]
+                                            [post_data.get('matched_keyword')],
+                                            campaign=self.campaign,
+                                            templates=self.load_comment_templates()
                                         )
                                         post_data['relevance_score'] = analysis.get('relevance_score', 0)
                                         post_data['recommendation'] = analysis.get('recommendation', 'review')
@@ -659,7 +661,9 @@ class FacebookMonitor:
                     analysis = self.analyzer.analyze_post(
                         post_data.get('text', ''),
                         post_data.get('author'),
-                        [matched_kw]
+                        [matched_kw],
+                        campaign=self.campaign,
+                        templates=self.load_comment_templates()
                     )
                     post_data['relevance_score'] = analysis.get('relevance_score', 0)
                     post_data['recommendation'] = analysis.get('recommendation', 'review')
@@ -1229,7 +1233,11 @@ class FacebookMonitor:
         
         # AI Analysis
         print("\n🧠 Running AI analysis...")
-        self.analyzed_posts = self.analyzer.analyze_batch(relevant_posts)
+        self.analyzed_posts = self.analyzer.analyze_batch(
+            relevant_posts,
+            campaign=self.campaign,
+            templates=self.load_comment_templates()
+        )
         
         # Print AI results
         print("\n📊 AI ANALYSIS RESULTS:")
