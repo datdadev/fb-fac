@@ -486,14 +486,19 @@ class FacebookMonitor:
             # Find posts on news feed
             posts = []
             try:
-                posts = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'x1yztbdb')]")
+                candidate_posts = self.driver.find_elements(By.CSS_SELECTOR, "[role='article']")
+                for p in candidate_posts:
+                    try:
+                        if p.is_displayed() and p.text and len(p.text.strip()) > 30:
+                            posts.append(p)
+                    except:
+                        pass
+                        
                 if not posts:
-                    posts = self.driver.find_elements(By.XPATH, "//div[@data-ad-comet-preview]")
-                if not posts:
-                    candidate_posts = self.driver.find_elements(By.CSS_SELECTOR, "[role='article']")
-                    for p in candidate_posts:
+                    candidate_posts2 = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'x1yztbdb')] | //div[@data-ad-comet-preview]")
+                    for p in candidate_posts2:
                         try:
-                            if p.text and len(p.text.strip()) > 30:
+                            if p.is_displayed() and p.text and len(p.text.strip()) > 30:
                                 posts.append(p)
                         except:
                             pass
@@ -505,7 +510,14 @@ class FacebookMonitor:
             for idx, post in enumerate(posts, 1):
                 try:
                     post_data = self._extract_post_data_v2(post)
-                    if not post_data or not post_data.get('text'):
+                    if not post_data:
+                        print(f"    ⚠️ Post #{idx}: _extract_post_data_v2 returned None")
+                        try:
+                            print(f"       [Debug] post.text = {post.text[:200].replace(chr(10), ' ')}")
+                        except: pass
+                        continue
+                    if not post_data.get('text'):
+                        print(f"    ⚠️ Post #{idx}: extracted text is empty")
                         continue
                         
                     # Check duplicate
@@ -555,6 +567,7 @@ class FacebookMonitor:
                             break
                             
                     if not matched_kw:
+                        print(f"    ⏭️ Post #{idx}: No keyword matched. Snippet: {full_post_text[:100].replace(chr(10), ' ')}...")
                         continue
                         
                     post_data['matched_keyword'] = matched_kw
@@ -905,6 +918,14 @@ class FacebookMonitor:
                     except:
                         continue
             
+            if not post_text:
+                try:
+                    text = post_element.text.strip()
+                    if text and len(text) > 10:
+                        post_text = text
+                except:
+                    pass
+                    
             if not post_text:
                 return None
             
