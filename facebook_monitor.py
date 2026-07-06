@@ -1465,52 +1465,77 @@ class FacebookMonitor:
                 self.driver.execute_script("arguments[0].click();", comment_input)
             
             time.sleep(1)
-            comment_input.send_keys(comment_text)
-            time.sleep(1.5)
             
-            # Upload picture if available for the current campaign before hitting RETURN
-            image_path = self._get_campaign_image_path()
-            if image_path:
-                try:
-                    print(f"📷 Attempting to attach image: {image_path}")
-                    file_input = None
-                    
-                    # Find the hidden input file element inside the same comment container/form
+            from selenium.webdriver.common.keys import Keys
+            
+            independent_comments = comment_text.split('\\n')
+            
+            for idx, ind_comment in enumerate(independent_comments):
+                ind_comment = ind_comment.strip()
+                if not ind_comment:
+                    continue
+                
+                if idx > 0:
+                    time.sleep(3)
                     try:
-                        ancestor_form = comment_input.find_element(By.XPATH, "./ancestor::form")
-                        file_input = ancestor_form.find_element(By.XPATH, ".//input[@type='file']")
+                        comment_input.click()
+                        time.sleep(1)
                     except:
                         pass
-                        
-                    if not file_input:
+                
+                # Xử lý \n thành Shift+Enter để không bị tách thành nhiều comment
+                lines = ind_comment.split('\n')
+                for i, line in enumerate(lines):
+                    comment_input.send_keys(line)
+                    if i < len(lines) - 1:
+                        comment_input.send_keys(Keys.SHIFT, Keys.ENTER)
+                
+                time.sleep(1.5)
+                
+                # Upload picture ONLY for the FIRST independent comment
+                if idx == 0:
+                    image_path = self._get_campaign_image_path()
+                    if image_path:
                         try:
-                            # Look for file inputs nearby
-                            file_input = comment_input.find_element(By.XPATH, "../..//input[@type='file']")
-                        except:
-                            pass
+                            print(f"📷 Attempting to attach image: {image_path}")
+                            file_input = None
                             
-                    if not file_input:
-                        try:
-                            file_inputs = self.driver.find_elements(By.XPATH, "//input[@type='file']")
-                            for inp in file_inputs:
-                                if inp.is_enabled():
-                                    file_input = inp
-                                    break
-                        except:
-                            pass
-                            
-                    if file_input:
-                        file_input.send_keys(os.path.abspath(image_path))
-                        print("✅ Attached image successfully! Waiting for upload to complete...")
-                        time.sleep(5) # Wait for image to upload and display
-                    else:
-                        print("⚠️ Could not find file input element to attach image.")
-                except Exception as upload_err:
-                    print(f"❌ Error uploading image: {upload_err}")
+                            # Find the hidden input file element inside the same comment container/form
+                            try:
+                                ancestor_form = comment_input.find_element(By.XPATH, "./ancestor::form")
+                                file_input = ancestor_form.find_element(By.XPATH, ".//input[@type='file']")
+                            except:
+                                pass
+                                
+                            if not file_input:
+                                try:
+                                    # Look for file inputs nearby
+                                    file_input = comment_input.find_element(By.XPATH, "../..//input[@type='file']")
+                                except:
+                                    pass
+                                    
+                            if not file_input:
+                                try:
+                                    file_inputs = self.driver.find_elements(By.XPATH, "//input[@type='file']")
+                                    for inp in file_inputs:
+                                        if inp.is_enabled():
+                                            file_input = inp
+                                            break
+                                except:
+                                    pass
+                                    
+                            if file_input:
+                                file_input.send_keys(os.path.abspath(image_path))
+                                print("✅ Attached image successfully! Waiting for upload to complete...")
+                                time.sleep(5) # Wait for image to upload and display
+                            else:
+                                print("⚠️ Could not find file input element to attach image.")
+                        except Exception as upload_err:
+                            print(f"❌ Error uploading image: {upload_err}")
 
-            comment_input.send_keys(Keys.RETURN)
-            print("🚀 Pressed Enter to post comment!")
-            time.sleep(4)
+                comment_input.send_keys(Keys.RETURN)
+                print(f"🚀 Pressed Enter to post comment #{idx + 1}!")
+                time.sleep(4)
             
             return True
             
