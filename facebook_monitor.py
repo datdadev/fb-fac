@@ -1530,18 +1530,32 @@ class FacebookMonitor:
                     except:
                         pass
                 
-                import pyperclip
-                
-                # Format text: change \n to standard newlines, facebook will parse them correctly when pasted
-                pyperclip.copy(ind_comment)
-                
                 try:
                     comment_input.click()
                 except:
                     self.driver.execute_script("arguments[0].focus();", comment_input)
                 
-                # Direct Ctrl+V to the element (triggers all React events properly)
-                comment_input.send_keys(Keys.CONTROL, 'v')
+                time.sleep(1)
+                
+                # 1. Inject text via JavaScript (bypasses Emoji crashes and OS clipboard focus issues)
+                js_script = """
+                    var el = arguments[0];
+                    var text = arguments[1];
+                    el.focus();
+                    while (el.firstChild) { el.removeChild(el.firstChild); }
+                    document.execCommand('insertText', false, text);
+                """
+                self.driver.execute_script(js_script, comment_input, ind_comment)
+                time.sleep(1.5)
+                
+                # 2. The "Space Trick": Send a real keystroke to force React to read the DOM and enable the Post button
+                try:
+                    comment_input.send_keys(" ")
+                    time.sleep(0.5)
+                    comment_input.send_keys(Keys.BACKSPACE)
+                except Exception as e:
+                    print(f"    ⚠️ Lỗi khi trigger React bằng phím Space: {e}")
+                
                 time.sleep(1.5)
                 
                 # Upload picture ONLY for the FIRST independent comment
