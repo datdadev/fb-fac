@@ -1530,22 +1530,23 @@ class FacebookMonitor:
                     except:
                         pass
                 
-                # Paste text using pyperclip to bypass emoji and contenteditable issues
-                import pyperclip
-                from selenium.webdriver.common.action_chains import ActionChains
-                
-                # Format text: change \n to standard newlines, facebook will parse them correctly when pasted
-                pyperclip.copy(ind_comment)
-                
-                try:
-                    # Focus first
-                    comment_input.click()
-                except:
-                    self.driver.execute_script("arguments[0].focus();", comment_input)
-                
-                # Ctrl+V
-                ActionChains(self.driver).key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
-                
+                # Inject text via JavaScript to bypass all OS-level clipboard and ActionChains issues
+                js_script = """
+                    var el = arguments[0];
+                    var text = arguments[1];
+                    el.focus();
+                    
+                    // Xóa nội dung cũ (nếu có)
+                    while (el.firstChild) { el.removeChild(el.firstChild); }
+                    
+                    // Insert the text natively
+                    document.execCommand('insertText', false, text);
+                    
+                    // Bắt buộc React nhận diện sự thay đổi
+                    var event = new Event('input', { bubbles: true });
+                    el.dispatchEvent(event);
+                """
+                self.driver.execute_script(js_script, comment_input, ind_comment)
                 time.sleep(1.5)
                 
                 # Upload picture ONLY for the FIRST independent comment
