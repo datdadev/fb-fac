@@ -530,12 +530,17 @@ class FacebookMonitor:
                                         self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", like_btn)
                                         time.sleep(0.5)
                                         try:
-                                            # Native click (trusted event)
-                                            like_btn.click()
+                                            # Native click bằng ActionChains (tự nhiên nhất)
+                                            from selenium.webdriver.common.action_chains import ActionChains
+                                            ActionChains(self.driver).move_to_element(like_btn).click().perform()
                                         except:
-                                            # Fallback JS click
-                                            self.driver.execute_script("arguments[0].click();", like_btn)
+                                            try:
+                                                like_btn.click()
+                                            except:
+                                                # Fallback JS click
+                                                self.driver.execute_script("arguments[0].click();", like_btn)
                                         print("    ✅ Đã thả Like thành công!")
+                                        time.sleep(1)
                                     else:
                                         print("    ⚠️ Bài viết này đã được thả Like từ trước.")
                                 else:
@@ -691,27 +696,38 @@ class FacebookMonitor:
         Robustly find the Like button of a Facebook post.
         Uses data-ad-rendering-role if available, otherwise falls back to aria-label matching.
         """
-        # 1. Best case: Facebook's internal rendering role
-        try:
-            btn = post_element.find_element(By.XPATH, ".//div[@data-ad-rendering-role='like_button']/ancestor::div[@role='button']")
-            return btn
-        except:
-            pass
-            
-        # 2. Fallback case: Match by exact or partial aria-label for 'Like'/'Thích'/'Remove Like'
         try:
             # Lấy tất cả các nút có thể là Like
             btns = post_element.find_elements(By.XPATH, ".//div[@role='button']")
+            
+            # Ưu tiên 1: Tìm bằng data-ad-rendering-role bên trong nút (chính xác 100%)
+            for btn in btns:
+                try:
+                    if btn.find_elements(By.XPATH, ".//div[@data-ad-rendering-role='like_button']"):
+                        # Đảm bảo đây là wrapper có aria-label chứa trạng thái (tránh lấy nhầm wrapper nhỏ xíu bên trong)
+                        if btn.get_attribute("aria-label"):
+                            return btn
+                except:
+                    pass
+            
+            # Ưu tiên 2: Tìm bằng aria-label chuẩn
             for btn in btns:
                 label = btn.get_attribute("aria-label")
                 if label:
                     label_lower = label.lower().strip()
                     if label_lower in ["like", "thích", "remove like", "gỡ thích", "bỏ thích"]:
                         return btn
-                    # Trường hợp chữ bị thêm/bớt khoảng trắng
+            
+            # Ưu tiên 3: Tìm bằng aria-label chứa từ khóa (có thể có khoảng trắng thừa)
+            for btn in btns:
+                label = btn.get_attribute("aria-label")
+                if label:
+                    label_lower = label.lower().strip()
                     if "remove like" in label_lower or "gỡ thích" in label_lower or "bỏ thích" in label_lower:
                         return btn
-        except:
+                        
+        except Exception as e:
+            print(f"    ⚠️ Lỗi khi tìm nút Like: {e}")
             pass
             
         return None
