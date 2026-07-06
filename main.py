@@ -9,8 +9,8 @@ from facebook_monitor import FacebookMonitor
 # Force UTF-8 encoding for stdout/stderr on Windows to support emojis and Vietnamese characters
 if sys.platform.startswith('win'):
     try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8-sig', errors='replace', write_through=True)
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8-sig', errors='replace', write_through=True)
     except Exception:
         pass
 
@@ -115,7 +115,7 @@ def main():
                 max_scroll = args.scrolls if args.scrolls is not None else 3
                 min_score = args.min_score if args.min_score is not None else 0.6
                 results = monitor.run(max_scroll, min_score)
-                with open('monitor_results.json', 'w', encoding='utf-8') as f:
+                with open('monitor_results.json', 'w', encoding='utf-8-sig') as f:
                     json.dump(results, f, indent=4, ensure_ascii=False)
                 print("✅ Results saved to monitor_results.json")
             elif choice == "4":
@@ -171,7 +171,7 @@ def main():
                 results = monitor.run(max_scroll, min_score)
                 
                 # Save results
-                with open('monitor_results.json', 'w', encoding='utf-8') as f:
+                with open('monitor_results.json', 'w', encoding='utf-8-sig') as f:
                     json.dump(results, f, indent=4, ensure_ascii=False)
                 print("✅ Results saved to monitor_results.json")
                 

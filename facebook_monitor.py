@@ -45,7 +45,7 @@ class FacebookMonitor:
     def load_keywords(self, filepath="keywords.json"):
         """Load keywords from JSON file"""
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
                 if isinstance(data, dict):
                     if self.campaign in data:
@@ -473,7 +473,7 @@ class FacebookMonitor:
         if self.found_posts:
             json_path = os.path.join(crawled_dir, "posts.json")
             try:
-                with open(json_path, 'w', encoding='utf-8') as f:
+                with open(json_path, 'w', encoding='utf-8-sig') as f:
                     json.dump(self.found_posts, f, indent=4, ensure_ascii=False)
                 print(f"\n💾 Saved all crawled posts data to {json_path}")
             except Exception as save_err:
@@ -1322,7 +1322,7 @@ class FacebookMonitor:
         """Load comment templates by language"""
         try:
             if os.path.exists(filepath):
-                with open(filepath, 'r', encoding='utf-8') as f:
+                with open(filepath, 'r', encoding='utf-8-sig') as f:
                     data = json.load(f)
                     if isinstance(data, dict) and self.campaign in data:
                         templates = data[self.campaign]
@@ -1344,7 +1344,7 @@ class FacebookMonitor:
         """Load already commented posts URLs"""
         try:
             if os.path.exists(filepath):
-                with open(filepath, 'r', encoding='utf-8') as f:
+                with open(filepath, 'r', encoding='utf-8-sig') as f:
                     data = json.load(f)
                     urls = set()
                     for item in data:
@@ -1364,7 +1364,7 @@ class FacebookMonitor:
             commented_list = []
             if os.path.exists(filepath):
                 try:
-                    with open(filepath, 'r', encoding='utf-8') as f:
+                    with open(filepath, 'r', encoding='utf-8-sig') as f:
                         commented_list = json.load(f)
                         if not isinstance(commented_list, list):
                             commented_list = []
@@ -1379,7 +1379,7 @@ class FacebookMonitor:
                 "comment_text": comment_text
             })
             
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, 'w', encoding='utf-8-sig') as f:
                 json.dump(commented_list, f, indent=4, ensure_ascii=False)
             
             print(f"💾 Saved comment record to {filepath}")
@@ -1751,7 +1751,7 @@ if __name__ == "__main__":
     
     if success:
         # Load keywords
-        with open('keywords.json', 'r', encoding='utf-8') as f:
+        with open('keywords.json', 'r', encoding='utf-8-sig') as f:
             keywords = json.load(f).get('keywords', [])
         
         # Create monitor

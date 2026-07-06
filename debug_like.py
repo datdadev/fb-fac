@@ -25,7 +25,7 @@ def debug_like():
     original_find = monitor._find_like_button
     
     def hooked_find(post_element):
-        print("\n--- HOOK: Searching for Like button ---")
+        print("\n--- HOOK: monitor_news_feeding for Like button ---")
         btn = original_find(post_element)
         if btn:
             print(f"Hook found button! aria-label: {btn.get_attribute('aria-label')}")
@@ -44,11 +44,11 @@ def debug_like():
         
     monitor._find_like_button = hooked_find
     
-    print("Running search with 1 scroll...")
+    print("Running monitor_news_feed with 1 scroll...")
     try:
-        monitor.search(max_scroll=1, min_score=0)
+        monitor.monitor_news_feed(max_scroll=3, min_score=0)
     except Exception as e:
-        print(f"Exception during search: {e}")
+        print(f"Exception during monitor_news_feed: {e}")
         
     # Take a final screenshot
     try:

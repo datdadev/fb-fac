@@ -70,7 +70,7 @@ class FacebookAuth:
         """Load selectors from JSON file"""
         if os.path.exists(SELECTOR_FILE) and os.path.getsize(SELECTOR_FILE) > 0:
             try:
-                with open(SELECTOR_FILE, 'r', encoding='utf-8') as f:
+                with open(SELECTOR_FILE, 'r', encoding='utf-8-sig') as f:
                     return json.load(f)
             except:
                 return {}
@@ -79,7 +79,7 @@ class FacebookAuth:
     def _save_selectors(self, selectors):
         """Save selectors to JSON file"""
         try:
-            with open(SELECTOR_FILE, 'w', encoding='utf-8') as f:
+            with open(SELECTOR_FILE, 'w', encoding='utf-8-sig') as f:
                 json.dump(selectors, f, indent=4, ensure_ascii=False)
             return True
         except:
