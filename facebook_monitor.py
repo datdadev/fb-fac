@@ -261,6 +261,32 @@ class FacebookMonitor:
                                 
                                 # Check duplicate
                                 if not self._is_duplicate(post_data):
+                                
+                                    # Check Sponsored/Quảng cáo
+                                    try:
+                                        full_text = post.text.lower() if post.text else post_data['text'].lower()
+                                    except:
+                                        full_text = post_data.get('text', '').lower()
+                                        
+                                    if "được tài trợ" in full_text or "sponsored" in full_text:
+                                        print("    ⏭️ Bỏ qua bài viết Quảng cáo (Sponsored).")
+                                        continue
+                                        
+                                    # Basic keyword check to avoid completely unrelated posts
+                                    # Since Facebook search can be fuzzy, we check if at least one part of the keyword is in the text
+                                    kw_lower = keyword.lower()
+                                    kw_parts = kw_lower.split()
+                                    has_kw = kw_lower in full_text
+                                    if not has_kw and len(kw_parts) > 1:
+                                        for p in kw_parts:
+                                            if len(p) >= 4 and p in full_text:
+                                                has_kw = True
+                                                break
+                                                
+                                    if not has_kw:
+                                        print(f"    ⏭️ Bỏ qua bài viết không chứa từ khóa '{keyword}'. Snippet: {full_text[:100].replace(chr(10), ' ')}...")
+                                        continue
+                                
                                     # Check if already liked (to skip previously interacted posts)
                                     try:
                                         already_liked = False
