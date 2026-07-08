@@ -51,19 +51,52 @@ class FacebookAuth:
         """Initialize Chrome WebDriver with anti-detection options"""
         print("[Selenium] Khởi tạo Webdriver...")
         
-        options = webdriver.ChromeOptions()
+        import undetected_chromedriver as uc
+        
+        options = uc.ChromeOptions()
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--start-maximized")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--no-sandbox")
         options.add_argument("--disable-notifications")
         options.add_argument("--disable-popup-blocking")
-        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        
+        # Use persistent profile to avoid 2FA loop / immediate logout
+        profile_path = os.path.join(os.getcwd(), "fb_profile")
+        options.add_argument(f"--user-data-dir={profile_path}")
         
         if self.headless:
             options.add_argument("--headless")
         
-        self.driver = webdriver.Chrome(options=options)
+        # Initialize undetected-chromedriver
+        try:
+            self.driver = uc.Chrome(options=options, use_subprocess=True)
+        except Exception as e:
+            error_msg = str(e)
+            if "version" in error_msg.lower():
+                import re
+                print(f"[Selenium] Trình duyệt Chrome không khớp version ChromeDriver. Thử tự động khắc phục...")
+                
+                # We cannot reuse the ChromeOptions object, so we must recreate it
+                fallback_options = uc.ChromeOptions()
+                fallback_options.add_argument("--disable-blink-features=AutomationControlled")
+                fallback_options.add_argument("--start-maximized")
+                fallback_options.add_argument("--disable-notifications")
+                fallback_options.add_argument("--disable-popup-blocking")
+                fallback_options.add_argument(f"--user-data-dir={profile_path}")
+                if self.headless:
+                    fallback_options.add_argument("--headless")
+                
+                # Extract current browser version from the error message
+                match = re.search(r"Current browser version is (\d+)", error_msg)
+                if match:
+                    major_version = int(match.group(1))
+                    print(f"[Selenium] Phát hiện Chrome version {major_version}, đang thử lại...")
+                    self.driver = uc.Chrome(options=fallback_options, use_subprocess=True, version_main=major_version)
+                else:
+                    print(f"[Selenium] Fallback Chrome version 149...")
+                    self.driver = uc.Chrome(options=fallback_options, use_subprocess=True, version_main=149)
+            else:
+                raise e
+                
         return self.driver
     
     def _load_selectors(self):
@@ -205,27 +238,41 @@ class FacebookAuth:
                         code_input.send_keys(Keys.RETURN)
                         print("✅ Đã nhấn Enter")
                     
-                    time.sleep(5)
+                    time.sleep(3)
                     
-                    if "checkpoint" not in self.driver.current_url.lower() and "two_step" not in self.driver.current_url.lower():
+                    # Auto-click Continue if "Save Browser" step appears
+                    try:
+                        save_btn = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Lưu trình duyệt') or contains(text(), 'Save') or contains(text(), 'Tiếp tục') or contains(text(), 'Continue') or contains(text(), 'Cho phép')]")
+                        save_btn.click()
+                        time.sleep(3)
+                    except:
+                        pass
+                        
+                    if "checkpoint" not in self.driver.current_url.lower() and "two_step" not in self.driver.current_url.lower() and "login" not in self.driver.current_url.lower():
                         print("✅ Xác thực 2FA thành công!")
                         return True
                     else:
-                        print("❌ Xác thực 2FA thất bại! Thử lại...")
-                        return self._handle_2fa()
+                        print("\n⚠️ Trình duyệt vẫn đang ở trang xác thực (hoặc bị văng ra trang đăng nhập).")
+                        print("👉 Vui lòng kiểm tra Chrome (có thể cần bấm 'Lưu trình duyệt' hoặc Đăng nhập lại).")
+                        input("✅ Nhấn Enter tại đây sau khi bạn đã vào được TRANG CHỦ Facebook...")
+                        
+                        if "checkpoint" not in self.driver.current_url.lower() and "two_step" not in self.driver.current_url.lower() and "login" not in self.driver.current_url.lower():
+                            print("✅ Xác thực 2FA thành công!")
+                            return True
+                        else:
+                            print("❌ Xác thực 2FA thất bại (Facebook bắt đăng nhập lại)!")
+                            return False
             else:
-                print("\n⚠️ Không tìm thấy input nhập mã 2FA!")
-                print("Vui lòng xác thực thủ công trên điện thoại hoặc email.")
-                input("✅ Nhấn Enter sau khi đã xác thực xong...")
+                print("\n⚠️ Không tìm thấy input nhập mã 2FA (hoặc đang ở bước xác nhận khác)!")
+                print("👉 Vui lòng thao tác xác thực trực tiếp trên cửa sổ Chrome.")
+                input("✅ Nhấn Enter tại đây sau khi bạn đã vào được TRANG CHỦ Facebook...")
                 
-                self.driver.refresh()
-                time.sleep(3)
-                
-                if "checkpoint" not in self.driver.current_url.lower() and "two_step" not in self.driver.current_url.lower():
+                if "checkpoint" not in self.driver.current_url.lower() and "two_step" not in self.driver.current_url.lower() and "login" not in self.driver.current_url.lower():
                     print("✅ Xác thực 2FA thành công!")
                     return True
                 else:
-                    return self._handle_2fa()
+                    print("❌ Xác thực 2FA thất bại!")
+                    return False
                     
         except Exception as e:
             print(f"⚠️ Lỗi xử lý 2FA: {e}")

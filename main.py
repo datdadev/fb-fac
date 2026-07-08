@@ -50,6 +50,9 @@ def main():
     if args.login:
         login_choice = args.login
     else:
+        print("\n=== LỰA CHỌN PHƯƠNG THỨC ĐĂNG NHẬP ===")
+        print("1. Sử dụng Cookies đã lưu (Nhanh nhất, bỏ qua 2FA nếu đã đăng nhập thành công)")
+        print("2. Đăng nhập lại từ đầu bằng Email/Password (Bắt buộc phải nhập lại mã 2FA)")
         login_choice = input("Chọn phương thức (1-2, mặc định là 1): ").strip()
         if not login_choice:
             login_choice = "1"
